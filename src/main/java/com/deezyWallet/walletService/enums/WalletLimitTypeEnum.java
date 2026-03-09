@@ -5,13 +5,13 @@ package com.deezyWallet.walletService.enums;
  * which limit was breached without exposing internal logic.
  */
 
-public enum WalletLimitType {
+public enum WalletLimitTypeEnum {
     DAILY(1),
     MONTHLY(2);
 
     private final int id;
 
-    WalletLimitType(int id) {
+    WalletLimitTypeEnum(int id) {
         this.id = id;
     }
 
@@ -19,7 +19,7 @@ public enum WalletLimitType {
         return id;
     }
 
-    public static WalletLimitType getEnumById(int id) {
+    public static WalletLimitTypeEnum getEnumById(int id) {
         switch (id) {
             case 1 -> {
                 return DAILY;
