@@ -1,4 +1,4 @@
-package com.deezyWallet.walletService;
+package com.deezyWallet.walletService.config;
 
 import java.util.HashMap;
 import java.util.Map;
