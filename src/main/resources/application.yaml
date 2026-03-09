@@ -1,0 +1,80 @@
+spring:
+  application:
+    name: walletService
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/wallet_db?serverTimezone=UTC&useSSL=false
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: validate          # Flyway owns schema — never let JPA touch it
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        default_schema: public
+    open-in-view: false           # Never true in microservices
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all                   # Wait for all ISR replicas to ack
+      retries: 3
+      properties:
+        enable.idempotence: true  # Exactly-once producer semantics
+        max.in.flight.requests.per.connection: 1
+    consumer:
+      group-id: wallet-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false   # Manual commit only
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.digitalwallet.*"
+
+jwt:
+  secret: ${JWT_SECRET}           # Same secret shared with User Service (or use public key)
+  issuer: digital-wallet-platform
+
+server:
+  port: 8082
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
