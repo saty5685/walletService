@@ -3,7 +3,9 @@ package com.deezyWallet.walletService.service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -483,7 +485,7 @@ public class WalletService {
 
 	/** Status check — for internal service pre-transaction validation. */
 	@Transactional(readOnly = true)
-	public WalletStatusResponse getWalletStatusEnum(String walletId) {
+	public WalletStatusResponse getWalletStatus(String walletId) {
 		Wallet wallet = walletRepository.findById(walletId)
 				.orElseThrow(() -> new WalletNotFoundException(walletId));
 		return walletMapper.toStatusResponse(wallet);
@@ -568,5 +570,166 @@ public class WalletService {
 		String datePart   = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 		String randomPart = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
 		return WalletConstants.WALLET_NUMBER_PREFIX + "-" + datePart + "-" + randomPart;
+	}
+	/**
+	 * Get full wallet details by walletId — admin path.
+	 *
+	 * Unlike getWalletByUserId() which scopes to the JWT's userId,
+	 * this method accepts any walletId directly (admin can view any wallet).
+	 *
+	 * Includes computed dailyLimitRemaining and monthlyLimitRemaining —
+	 * needed for the admin wallet detail page.
+	 *
+	 * Called by:
+	 *   AdminWalletController.getWallet()       GET /admin/wallets/{walletId}
+	 *   AdminWalletController.freezeWallet()    POST /admin/wallets/{walletId}/freeze
+	 *   AdminWalletController.unfreezeWallet()  POST /admin/wallets/{walletId}/unfreeze
+	 *
+	 * @param walletId wallet UUID from path variable
+	 */
+	@Transactional(readOnly = true)
+	public WalletResponse getWalletById(String walletId) {
+		Wallet wallet = walletRepository.findById(walletId)
+				.orElseThrow(() -> new WalletNotFoundException(walletId));
+		BigDecimal dailySpent   = limitService.getDailySpent(walletId);
+		BigDecimal monthlySpent = limitService.getMonthlySpent(walletId);
+		return walletMapper.toResponse(wallet, dailySpent, monthlySpent);
+	}
+
+	/**
+	 * Admin-freeze a wallet by walletId directly.
+	 *
+	 * WHY a separate freezeWalletById vs the existing freezeWallet(userId,...)?
+	 *
+	 * freezeWallet(userId)      — user-event path: looks up wallet by userId.
+	 *                             Used by UserEventConsumer (USER_SUSPENDED) and
+	 *                             WalletController (POST /me/freeze).
+	 *
+	 * freezeWalletById(walletId)— admin path: admin has walletId from the URL.
+	 *                             Looking up by userId from a walletId would
+	 *                             require an extra query. Direct walletId lookup
+	 *                             is one query and the natural admin workflow.
+	 *
+	 * Both are idempotent: if already FROZEN, return early without error.
+	 *
+	 * changedBy = admin's userId from JWT (passed from AdminWalletController).
+	 * Stored in WalletStatusChangedEvent — immutable audit trail.
+	 *
+	 * @param walletId  wallet UUID from admin path variable
+	 * @param changedBy admin's userId extracted from their JWT
+	 * @param reason    free-text audit reason (e.g. "AML_FLAG", "USER_COMPLAINT")
+	 */
+	@Transactional
+	public void freezeWalletById(String walletId, String changedBy, String reason) {
+		Wallet wallet = walletRepository.findById(walletId)
+				.orElseThrow(() -> new WalletNotFoundException(walletId));
+
+		if (wallet.getStatus() == WalletStatusEnum.FROZEN) {
+			log.info("Wallet already FROZEN walletId={} — skipping (idempotent)", walletId);
+			return;
+		}
+
+		WalletStatusEnum previous = wallet.getStatus();
+		wallet.setStatus(WalletStatusEnum.FROZEN);
+		walletRepository.save(wallet);
+
+		// Evict stale balance — frozen wallet must not serve ACTIVE balance from cache
+		cacheService.evictBalance(walletId);
+
+		log.info("Wallet FROZEN (admin): walletId={} previousStatus={} by={} reason={}",
+				walletId, previous, changedBy, reason);
+
+		// Publish WALLET_FROZEN — Notification Service sends "wallet frozen" message to user
+		eventProducer.publish(
+				eventFactory.buildStatusChangedEvent(wallet, previous, changedBy, reason));
+	}
+
+	/**
+	 * Paginated wallet list for admin dashboard.
+	 *
+	 * Two modes:
+	 *   status != null → filtered by status (e.g., all FROZEN wallets for AML review)
+	 *   status == null → all wallets, newest first
+	 *
+	 * WHY no limit computation in the list view?
+	 *   Computing dailyLimitRemaining + monthlyLimitRemaining requires 2 DB queries
+	 *   per wallet (getDailySpent + sumMonthlySpent). For a page of 20 wallets
+	 *   that's 40 extra queries per request — an N+2 query problem.
+	 *
+	 *   The admin list view doesn't need remaining limits — it's a summary table.
+	 *   Limits are shown on the detail page (getWalletById) where the cost is
+	 *   acceptable for a single wallet.
+	 *
+	 *   walletMapper.toResponse(wallet) — the single-arg overload — returns
+	 *   null for dailyLimitRemaining and monthlyLimitRemaining.
+	 *   @JsonInclude(NON_NULL) on WalletResponse omits them from JSON output.
+	 *
+	 * @param status optional filter — null means return all statuses
+	 * @param page   0-indexed page number
+	 * @param size   page size (capped at MAX_PAGE_SIZE)
+	 */
+	@Transactional(readOnly = true)
+	public PagedResponse<WalletResponse> listWallets(WalletStatusEnum status, int page, int size) {
+		int safeSize = Math.min(size, WalletConstants.MAX_PAGE_SIZE);
+		PageRequest pageable = PageRequest.of(
+				page, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+		Page<Wallet> walletPage = (status != null)
+				? walletRepository.findAllByStatus(status, pageable)
+				: walletRepository.findAll(pageable);
+
+		// Map without limit computation — avoids N+2 query problem on list views
+		List<WalletResponse> content = walletPage.getContent().stream()
+				.map(walletMapper::toResponse)   // single-arg overload: no limit remainders
+				.collect(Collectors.toList());
+
+		return PagedResponse.<WalletResponse>builder()
+				.content(content)
+				.page(walletPage.getNumber())
+				.size(walletPage.getSize())
+				.totalElements(walletPage.getTotalElements())
+				.totalPages(walletPage.getTotalPages())
+				.last(walletPage.isLast())
+				.build();
+	}
+
+	/**
+	 * Transaction history by walletId — admin path.
+	 *
+	 * WHY a separate method vs the existing getTransactionHistory(userId)?
+	 *
+	 * getTransactionHistory(userId)    — user path: resolves userId → walletId
+	 *                                    via resolveWalletId() (cache-first).
+	 *                                    userId comes from JWT.
+	 *
+	 * getTransactionHistoryById(walletId) — admin path: admin has walletId
+	 *                                    directly from the URL path variable.
+	 *                                    No userId resolution needed.
+	 *                                    No ownership check — admin can view any wallet.
+	 *
+	 * Both use the same underlying repository query and mapper — just different
+	 * entry points reflecting different callers.
+	 *
+	 * @param walletId wallet UUID from admin path variable
+	 * @param page     0-indexed page number
+	 * @param size     page size (capped at MAX_PAGE_SIZE)
+	 */
+	@Transactional(readOnly = true)
+	public PagedResponse<WalletTransactionResponse> getTransactionHistoryById(
+			String walletId, int page, int size) {
+
+		// Confirm wallet exists — 404 if not, rather than returning empty page
+		if (!walletRepository.existsById(walletId)) {
+			throw new WalletNotFoundException(walletId);
+		}
+
+		int safeSize = Math.min(size, WalletConstants.MAX_PAGE_SIZE);
+		Pageable pageable = PageRequest.of(
+				page, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+		Page<WalletTransaction> txPage =
+				transactionRepository.findByWalletIdOrderByCreatedAtDesc(walletId, pageable);
+
+		return walletMapper.toTransactionPagedResponse(txPage);
 	}
 }
