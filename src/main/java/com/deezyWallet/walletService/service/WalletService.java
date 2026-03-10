@@ -1,5 +1,19 @@
 package com.deezyWallet.walletService.service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.deezyWallet.walletService.constants.WalletConstants;
 import com.deezyWallet.walletService.dto.request.BlockFundsRequest;
 import com.deezyWallet.walletService.dto.request.CreditRequest;
@@ -15,8 +29,7 @@ import com.deezyWallet.walletService.entity.WalletTransaction;
 import com.deezyWallet.walletService.enums.TransactionTypeEnum;
 import com.deezyWallet.walletService.enums.WalletStatusEnum;
 import com.deezyWallet.walletService.event.EventFactory;
-import com.deezyWallet.walletService.event.outbound.WalletCreditedEvent;
-import com.deezyWallet.walletService.event.outbound.WalletDebitedEvent;
+import com.deezyWallet.walletService.event.producer.WalletEventProducer;
 import com.deezyWallet.walletService.exception.DuplicateOperationException;
 import com.deezyWallet.walletService.exception.InsufficientBalanceException;
 import com.deezyWallet.walletService.exception.WalletAccessDeniedException;
@@ -25,21 +38,9 @@ import com.deezyWallet.walletService.exception.WalletNotFoundException;
 import com.deezyWallet.walletService.mapper.WalletMapper;
 import com.deezyWallet.walletService.repository.WalletRepository;
 import com.deezyWallet.walletService.repository.WalletTransactionRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.UUID;
 
 /**
  * WalletService — core business logic orchestrator.
