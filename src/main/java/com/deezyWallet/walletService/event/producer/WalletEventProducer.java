@@ -84,7 +84,7 @@ public class WalletEventProducer {
 	 * Key extraction: we use reflection-free extraction via a helper.
 	 * Every outbound event POJO has a getWalletId() method — used as partition key.
 	 *
-	 * @param event any outbound event POJO from com.digitalwallet.wallet.event.outbound
+	 * @param event any outbound event POJO from com.deezyWallet.walletService.event.outbound
 	 */
 	public void publish(Object event) {
 		String walletId = extractWalletId(event);

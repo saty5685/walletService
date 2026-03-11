@@ -33,6 +33,8 @@
 spring:
   application:
     name: walletService
+  profiles:
+    default: local
 
   # ── Jackson ────────────────────────────────────────────────────────────────
   # These are backup defaults. Our JacksonConfig @Bean takes precedence

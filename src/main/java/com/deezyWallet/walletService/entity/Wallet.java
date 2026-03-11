@@ -132,7 +132,7 @@ public class Wallet {
 	 * ISO-4217 currency code. Hardcoded "INR" for now.
 	 * Schema is ready for multi-currency — just add conversion logic later.
 	 */
-	@Column(nullable = false, length = 3)
+	@Column(nullable = false, length = 3, columnDefinition = "CHAR(3)")
 	@Builder.Default
 	private String currency = WalletConstants.DEFAULT_CURRENCY;
 

@@ -126,7 +126,7 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
            SELECT COALESCE(SUM(wt.amount), 0)
            FROM WalletTransaction wt
            WHERE wt.walletId = :walletId
-             AND wt.type     = com.digitalwallet.wallet.enums.TransactionType.DEBIT
+             AND wt.type     = com.deezyWallet.walletService.enums.TransactionTypeEnum.DEBIT
              AND wt.createdAt >= :from
              AND wt.createdAt <  :to
            """)
@@ -144,7 +144,7 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
            SELECT COUNT(wt)
            FROM WalletTransaction wt
            WHERE wt.walletId   = :walletId
-             AND wt.type       = com.digitalwallet.wallet.enums.TransactionType.DEBIT
+             AND wt.type       = com.deezyWallet.walletService.enums.TransactionTypeEnum.DEBIT
              AND wt.createdAt >= :from
            """)
 	long countDebitsAfter(
