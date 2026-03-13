@@ -104,7 +104,7 @@ public class WalletTransaction {
 	@Column(name = "balance_after", nullable = false, precision = 19, scale = 4, updatable = false)
 	private BigDecimal balanceAfter;
 
-	@Column(nullable = false, length = 3, updatable = false)
+	@Column(nullable = false, length = 3, updatable = false, columnDefinition = "CHAR(3)")
 	@Builder.Default
 	private String currency = "INR";
 
