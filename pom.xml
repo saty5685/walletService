@@ -6,15 +6,6 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- ── Parent ──────────────────────────────────────────────────────────── -->
-    <!--
-        Spring Boot parent POM provides:
-          - Dependency management (no versions needed for spring-* artifacts)
-          - Plugin management (maven-compiler-plugin, spring-boot-maven-plugin)
-          - Default resource filtering
-          - Sane default build config
-        We extend it — never replace it — to get all these for free.
-    -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -22,7 +13,6 @@
         <relativePath/>
     </parent>
 
-    <!-- ── Project coordinates ────────────────────────────────────────────── -->
     <groupId>com.digitalwallet</groupId>
     <artifactId>walletService</artifactId>
     <version>1.0.0-SNAPSHOT</version>
@@ -30,19 +20,10 @@
     <name>walletService</name>
     <description>Digital Wallet — Wallet Microservice</description>
 
-    <!-- ── Version properties ─────────────────────────────────────────────── -->
-    <!--
-        ALL versions declared here — never inline in <dependency>.
-        One place to update, one place to audit, one place to review in PRs.
-        Property naming convention: <artifactId>.version
-    -->
     <properties>
         <!-- Java -->
         <java.version>17</java.version>
-
-        <!-- Spring ecosystem (managed by parent — listed for clarity) -->
-        <!-- spring-boot.version inherited from parent 3.3.4 -->
-        <!-- spring-kafka version managed by Boot parent                -->
+        <spring-cloud.version>2023.0.3</spring-cloud.version>
 
         <!-- Database -->
         <mysql.connector.version>8.3.0</mysql.connector.version>
@@ -52,7 +33,13 @@
         <jjwt.version>0.12.6</jjwt.version>
 
         <!-- Utilities -->
-        <lombok.version>1.18.34</lombok.version>
+        <!--
+            FIX 1: Lombok 1.18.34 has a known bug with Java 17 javac internals
+            (TypeTag::UNKNOWN = ExceptionInInitializerError).
+            1.18.36 is the first release with the fix for Java 17+ compatibility.
+            See: https://github.com/projectlombok/lombok/issues/3722
+        -->
+        <lombok.version>1.18.36</lombok.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
 
         <!-- Testing -->
@@ -62,137 +49,73 @@
         <!-- Build -->
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <!-- ── Dependencies ───────────────────────────────────────────────────── -->
     <dependencies>
 
         <!-- ════════════════════════════════════════════════════════════════ -->
         <!-- SPRING BOOT STARTERS                                            -->
         <!-- ════════════════════════════════════════════════════════════════ -->
 
-        <!--
-            spring-boot-starter-web
-            Includes: Spring MVC, Jackson, Tomcat (embedded), Hibernate Validator.
-            Gives us: @RestController, @RequestMapping, @Valid, ResponseEntity.
-            Tomcat is the default — swap for Netty if reactive is needed later.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!--
-            spring-boot-starter-data-jpa
-            Includes: Hibernate ORM, Spring Data JPA, spring-tx.
-            Gives us: @Entity, JpaRepository, @Transactional, @Lock,
-                      @Version, Spring Data query methods.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!--
-            spring-boot-starter-data-redis
-            Includes: Lettuce client (non-blocking, reactive-compatible),
-                      RedisTemplate, spring-data-redis.
-            Gives us: RedisTemplate<String,String>, opsForValue().setIfAbsent()
-                      (SETNX), TTL support.
-            WHY Lettuce over Jedis?
-              Lettuce uses Netty — single connection handles concurrent requests
-              without a connection pool per thread. Better under high concurrency.
-              Jedis is thread-unsafe without explicit pooling.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!--
-            spring-boot-starter-security
-            Includes: Spring Security core, web security, crypto.
-            Gives us: SecurityFilterChain, @PreAuthorize, @AuthenticationPrincipal,
-                      UsernamePasswordAuthenticationToken, SecurityContextHolder.
-            NOTE: Adding this dependency locks down ALL endpoints by default —
-                  SecurityConfig explicitly permits /actuator/health etc.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!--
-            spring-boot-starter-validation
-            Includes: Hibernate Validator (JSR-380), jakarta.validation-api.
-            Gives us: @Valid, @NotNull, @NotBlank, @DecimalMin, @Digits,
-                      @Min, @Max, @DecimalMax on DTOs and @RequestParam.
-            Required separately from spring-boot-starter-web in Boot 3.x
-            (validator was bundled in Boot 2.x but extracted in 3.x).
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!--
-            spring-boot-starter-actuator
-            Gives us: /actuator/health, /actuator/metrics, /actuator/prometheus.
-            SecurityConfig permits /actuator/health unauthenticated —
-            needed for Kubernetes liveness/readiness probes.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!--
-            spring-kafka
-            Includes: KafkaTemplate, @KafkaListener, ConcurrentKafkaListenerContainerFactory,
-                      DefaultErrorHandler, DeadLetterPublishingRecoverer.
-            Version managed by Spring Boot parent — always compatible.
-            Gives us everything in KafkaConsumerConfig and KafkaProducerConfig.
-        -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!--
-            spring-retry
-            Gives us: @Retryable, @Backoff on WalletService.credit().
-            Required explicitly — not included transitively by any Boot starter.
-            Must also add @EnableRetry on the main application class
-            (already present in WalletServiceApplication.java — add if missing).
-        -->
         <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
         </dependency>
 
-        <!--
-            spring-boot-starter-aop
-            Required by spring-retry to intercept @Retryable methods.
-            @Retryable works via AOP proxy — without this, @Retryable silently
-            does nothing (no error, just no retry). A common gotcha.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
         <!-- ════════════════════════════════════════════════════════════════ -->
         <!-- DATABASE                                                         -->
         <!-- ════════════════════════════════════════════════════════════════ -->
 
-        <!--
-            MySQL Connector/J
-            JDBC driver for MySQL 8.0+.
-            scope=runtime — not needed at compile time, only at runtime.
-            Version pinned explicitly — Boot parent manages MySQL but may lag
-            behind the latest driver. 8.3.0 supports MySQL 8.0.x and 8.4.x.
-        -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
@@ -200,16 +123,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!--
-            Flyway MySQL
-            Database migration tool — manages V1__, V2__ migration scripts.
-            WHY flyway-mysql specifically and not just flyway-core?
-              Flyway 10.x split database-specific support into separate modules.
-              flyway-mysql includes MySQL dialect support (DATETIME(6), etc.).
-              Without it, Flyway throws "No database found to handle jdbc:mysql://".
-            spring-boot-starter-data-jpa triggers Flyway auto-configuration
-            automatically when flyway-core is on the classpath.
-        -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -225,23 +138,6 @@
         <!-- SECURITY — JWT                                                   -->
         <!-- ════════════════════════════════════════════════════════════════ -->
 
-        <!--
-            JJWT (Java JWT) — io.jsonwebtoken
-            Three artifacts required together — they split into modules in 0.12.x:
-              jjwt-api      : interfaces and annotations (compile scope)
-              jjwt-impl     : implementation (runtime — not used at compile time)
-              jjwt-jackson  : Jackson serialiser for JWT claims (runtime)
-
-            Gives us: Jwts.parser(), Keys.hmacShaKeyFor(), Claims,
-                      ExpiredJwtException, JwtException.
-
-            WHY JJWT over spring-security-oauth2-resource-server?
-              OAuth2 resource server requires full OIDC/OAuth2 infrastructure
-              (authorization server URL, JWKS endpoint). We use a simpler
-              shared-secret approach — JJWT is the right tool for this.
-              If we later move to RS256 with a JWKS endpoint, swap to
-              spring-security-oauth2-resource-server with minimal controller changes.
-        -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -264,18 +160,6 @@
         <!-- UTILITIES                                                        -->
         <!-- ════════════════════════════════════════════════════════════════ -->
 
-        <!--
-            Lombok
-            Annotation processor — generates boilerplate at compile time:
-              @Getter, @Setter, @Builder, @NoArgsConstructor, @AllArgsConstructor,
-              @RequiredArgsConstructor, @Slf4j, @Data.
-            scope=provided — needed at compile time only, not at runtime.
-            annotationProcessorPaths in maven-compiler-plugin (below) registers
-            Lombok as an annotation processor for Java 21 compatibility.
-
-            IMPORTANT: Lombok must be declared BEFORE MapStruct in
-            annotationProcessorPaths — Lombok generates the code MapStruct maps.
-        -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -283,15 +167,6 @@
             <scope>provided</scope>
         </dependency>
 
-        <!--
-            Jackson Datatype JSR310
-            Adds support for Java 8+ date/time types (LocalDateTime, LocalDate, etc.)
-            to Jackson's ObjectMapper.
-            Registered in JacksonConfig via mapper.registerModule(new JavaTimeModule()).
-            Without this: "No serializer found for class java.time.LocalDateTime".
-            Version managed by Spring Boot parent — always aligned with the
-            jackson-databind version Boot uses.
-        -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
@@ -301,14 +176,6 @@
         <!-- OBSERVABILITY                                                    -->
         <!-- ════════════════════════════════════════════════════════════════ -->
 
-        <!--
-            Micrometer Prometheus Registry
-            Exports metrics in Prometheus format at /actuator/prometheus.
-            Scraped by Prometheus → visualised in Grafana.
-            Metrics include: JVM heap, GC, HTTP request duration,
-                             Kafka consumer lag, Hikari pool stats.
-            scope=runtime — Micrometer API is provided by spring-boot-starter-actuator.
-        -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
@@ -319,54 +186,24 @@
         <!-- TESTING                                                          -->
         <!-- ════════════════════════════════════════════════════════════════ -->
 
-        <!--
-            spring-boot-starter-test
-            Includes: JUnit 5, Mockito, AssertJ, Spring Test, MockMvc,
-                      @SpringBootTest, @WebMvcTest, @DataJpaTest.
-            scope=test — not included in the production JAR.
-        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!--
-            spring-security-test
-            Gives us: @WithMockUser, SecurityMockMvcRequestPostProcessors.jwt(),
-                      mockMvc.with(user("admin").roles("ADMIN")).
-            Required for testing secured endpoints in @WebMvcTest slices.
-        -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!--
-            spring-kafka-test
-            Gives us: @EmbeddedKafka for integration tests without a real broker.
-            EmbeddedKafka starts an in-process Kafka — full producer/consumer
-            round-trip testing without Docker in the test phase.
-        -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!--
-            Testcontainers — MySQL
-            Spins up a real MySQL Docker container for @DataJpaTest integration tests.
-            Gives us: @Container, MySQLContainer, @Testcontainers.
-            WHY real MySQL over H2?
-              H2's MySQL compatibility mode doesn't support:
-                - DEFAULT (UUID()) expression defaults
-                - ON DUPLICATE KEY UPDATE (native upsert)
-                - DECIMAL(19,4) precision exactly
-                - MySQL trigger syntax
-              Using real MySQL catches these issues in CI.
-        -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -381,20 +218,21 @@
         </dependency>
 
     </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
-    <!-- ── Build ───────────────────────────────────────────────────────────── -->
     <build>
         <plugins>
 
-            <!--
-                spring-boot-maven-plugin
-                Packages the service as an executable fat JAR containing all
-                dependencies. Used for: mvn spring-boot:run (local dev),
-                docker build (Dockerfile COPY target/*.jar app.jar).
-
-                Excludes Lombok from the fat JAR (it's compile-only — the
-                generated code is already in the compiled classes).
-            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -407,58 +245,47 @@
                     </excludes>
                 </configuration>
             </plugin>
-
-            <!--
-                maven-compiler-plugin
-                Configured for Java 21 with two annotation processors:
-                  1. Lombok  — generates @Builder, @Getter, @Slf4j etc.
-                  2. MapStruct — generates mapper implementations (future use).
-
-                ORDER MATTERS in annotationProcessorPaths:
-                  Lombok must come FIRST. MapStruct generates code that references
-                  Lombok-generated methods (getters). If MapStruct runs first,
-                  it can't find those methods and generates incomplete mappers.
-
-                compilerArgs:
-                  -parameters — preserves method parameter names in bytecode.
-                  Required for Spring MVC to bind @RequestParam by name without
-                  explicit @RequestParam("name") on every parameter.
-            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>17</release>
                     <annotationProcessorPaths>
-                        <!-- 1. Lombok FIRST -->
+                        <!-- 1. Lombok FIRST — always -->
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
                         </path>
-                        <!-- 2. MapStruct SECOND (future use) -->
+                        <!-- 2. MapStruct SECOND -->
                         <path>
                             <groupId>org.mapstruct</groupId>
                             <artifactId>mapstruct-processor</artifactId>
                             <version>${mapstruct.version}</version>
                         </path>
+                        <!--
+                            3. lombok-mapstruct-binding — THE KEY FIX for IntelliJ.
+                            This binding artifact explicitly wires Lombok and MapStruct
+                            annotation processors so IntelliJ's incremental compiler
+                            always runs them in the correct order regardless of its
+                            own internal scheduling.
+                            Without this, IntelliJ triggers the TypeTag::UNKNOWN
+                            ExceptionInInitializerError during its incremental build
+                            even when Maven CLI works fine.
+                        -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
+                        </path>
                     </annotationProcessorPaths>
                     <compilerArgs>
                         <arg>-parameters</arg>
+                        <arg>-Xlint:-options</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
 
-            <!--
-                maven-surefire-plugin
-                Runs JUnit 5 unit tests (src/test/java).
-                forkCount=1 — each test JVM gets its own process (isolation).
-                reuseForks=true — reuse the forked JVM across test classes
-                (faster than forking per class).
-                argLine — extra JVM args for test process:
-                  -Xmx512m — prevent OOM on CI runners with limited RAM.
-            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -469,15 +296,6 @@
                 </configuration>
             </plugin>
 
-            <!--
-                maven-failsafe-plugin
-                Runs integration tests (*IT.java, *IntegrationTest.java).
-                Separated from Surefire so integration tests (Testcontainers,
-                @SpringBootTest) don't slow down the fast unit test phase.
-
-                mvn verify runs both: surefire (unit) then failsafe (integration).
-                mvn test runs only surefire (unit).
-            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -494,25 +312,8 @@
         </plugins>
     </build>
 
-    <!-- ── Profiles ───────────────────────────────────────────────────────── -->
-    <!--
-        Maven profiles let us switch config between environments.
-        Activated via: mvn spring-boot:run -Plocal
-                       mvn package -Pprod
-    -->
     <profiles>
 
-        <!--
-            local profile — for developer machines
-            Activates by default (activeByDefault=true).
-            Sets spring.profiles.active=local → loads application-local.yml
-            application-local.yml overrides:
-              - DB URL → localhost:3306
-              - Redis  → localhost:6379
-              - Kafka  → localhost:9092
-              - Eureka → localhost:8761
-              - JWT secret → dev-only insecure value (never use in prod)
-        -->
         <profile>
             <id>local</id>
             <activation>
@@ -523,15 +324,6 @@
             </properties>
         </profile>
 
-        <!--
-            docker profile — for running inside Docker Compose locally
-            mvn package -Pdocker
-            Loads application-docker.yml:
-              - DB URL    → mysql:3306 (Docker service name)
-              - Redis     → redis:6379
-              - Kafka     → kafka:9092
-              All resolved by Docker Compose internal DNS.
-        -->
         <profile>
             <id>docker</id>
             <properties>
@@ -539,15 +331,6 @@
             </properties>
         </profile>
 
-        <!--
-            prod profile — for Kubernetes / production deployment
-            mvn package -Pprod
-            Loads application-prod.yml:
-              - All URLs from environment variables (injected by Kubernetes Secrets)
-              - JWT secret from Vault / K8s Secret
-              - Flyway validateOnMigrate=true (never auto-migrate in prod)
-              - Logging level=WARN (reduce noise)
-        -->
         <profile>
             <id>prod</id>
             <properties>

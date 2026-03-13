@@ -1,15 +1,20 @@
 package com.deezyWallet.walletService.security;
 
+import java.util.List;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.stereotype.Component;
+
 import com.deezyWallet.walletService.config.JwtProperties;
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
-import java.util.List;
 
 /**
  * Stateless JWT validator for the Wallet Service (resource server role).
@@ -62,7 +67,6 @@ public class JwtTokenValidator {
 	}
 
 	private SecretKey signingKey() {
-		byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
-		return Keys.hmacShaKeyFor(keyBytes);
+		return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes());
 	}
 }

@@ -294,6 +294,14 @@ logging:
     org.hibernate.type.descriptor.sql: TRACE
     # TRACE — see bind parameter values alongside SQL. Very verbose.
     # Disable if logs are too noisy. Never enable in prod (logs PII/amounts).
+  cloud:
+    discovery:
+      enabled: true
+
+  eureka:
+    client:
+      service-url:
+        defaultZone: http://localhost:8761/eureka
 
 
 # ═════════════════════════════════════════════════════════════════════════════
