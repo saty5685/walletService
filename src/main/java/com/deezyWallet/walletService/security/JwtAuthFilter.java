@@ -50,7 +50,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 			HttpServletResponse response,
 			FilterChain filterChain)
 			throws ServletException, IOException {
-
+		String requestURI = request.getRequestURI();
+		log.info("Request URI: {}: {}", request.getMethod(), request.getRequestURI());
 		String token = extractToken(request);
 
 		if (token != null) {
