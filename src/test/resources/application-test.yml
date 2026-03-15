@@ -1,0 +1,54 @@
+spring:
+  # Flyway — always enabled in tests, same as production.
+  # We want to verify migrations apply correctly.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+      # validate — Flyway owns the schema, Hibernate only verifies mappings.
+      # If an entity field doesn't match a column, test fails loudly.
+
+  # Redis — disabled for unit tests.
+  # Integration tests that need Redis use @MockBean on BalanceCacheService
+  # rather than spinning up a real Redis container.
+  # Lettuce auto-config is still present but no real connection is made
+  # in unit test slices (@WebMvcTest, pure @ExtendWith(MockitoExtension)).
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # Kafka — bootstrap-servers is set dynamically by @EmbeddedKafka.
+  # This placeholder is overridden at test startup.
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      group-id: wallet-service-test
+      properties:
+        spring.json.trusted.packages: "com.deezyWallet.*"
+        spring.json.use.type.headers: false
+    producer:
+      properties:
+        spring.json.add.type.headers: false
+
+# JWT — test secret (64+ chars for HS512 minimum 512 bits)
+jwt:
+  secret: test-secret-key-for-wallet-service-unit-and-integration-tests-only-not-prod
+  issuer: digital-wallet-platform
+  expiration-ms: 3600000
+
+# Logging — quiet during tests, errors are surfaced by test assertions
+logging:
+  level:
+    root: WARN
+    com.digitalwallet.wallet: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.kafka: WARN
+    org.springframework.security: WARN
