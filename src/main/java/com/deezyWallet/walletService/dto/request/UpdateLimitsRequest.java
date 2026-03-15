@@ -6,6 +6,8 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -25,7 +27,9 @@ import lombok.NoArgsConstructor;
  * requires KYC upgrade — enforced in WalletService.updateLimits().
  */
 @Getter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class UpdateLimitsRequest {
 
 	@NotNull(message = "Daily limit is required")
