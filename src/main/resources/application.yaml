@@ -130,6 +130,9 @@ spring:
         spring.json.use.type.headers: false
         # Don't require __TypeId__ header — pairs with add.type.headers=false above.
         # Each listener maps its topic to the correct POJO explicitly.
+        spring.json.value.default.type: "java.util.LinkedHashMap"
+        # Default deserialization target when no type headers are present.
+        # Consumers manually convert from Map to their specific event POJOs.
 
   # ── Data / Redis base ──────────────────────────────────────────────────────
   data:
@@ -279,7 +282,7 @@ spring:
     # the app context starts. Must match datasource URL exactly.
 
 jwt:
-  secret: local-dev-secret-key-minimum-512-bits-for-hs512-algorithm-padding-here
+  secret: bG9jYWwtZGV2LXNlY3JldC1mb3ItdXNlci1zZXJ2aWNlLW9ubHktbm90LXByb2R1Y3Rpb24tNjRieXRlc21pbg==
   # HS512 requires minimum 512 bits (64 bytes). This dev secret is exactly
   # 64+ chars. NEVER use this value outside local dev.
 

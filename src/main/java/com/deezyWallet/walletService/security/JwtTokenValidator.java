@@ -12,6 +12,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +68,6 @@ public class JwtTokenValidator {
 	}
 
 	private SecretKey signingKey() {
-		return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes());
+		return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.getSecret()));
 	}
 }
