@@ -22,7 +22,11 @@ function BlogDetail() {
       <div className="blog-meta">
         By {blog.author || 'Admin'} | {new Date(blog.createdAt).toLocaleDateString()}
       </div>
-      <div className="blog-body" dangerouslySetInnerHTML={{ __html: blog.content?.replace(/\n/g, '<br/>') }} />
+      <div className="blog-body">
+        {blog.content?.split('\n').map((paragraph, idx) => (
+          <p key={idx} style={{ marginBottom: '10px' }}>{paragraph}</p>
+        ))}
+      </div>
     </div>
   );
 }
